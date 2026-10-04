@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# Logs & runtime artifacts
+logs/
+*.log
+
+# Local SQLite trade DB (schema lives in migrations; data is runtime)
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/*.json
+
+# Research notebooks (local only)
+research_notebook/
+
+# Local overrides / secrets
+config/settings.local.yaml
+.env
+
+# OS
+.DS_Store
+Thumbs.db

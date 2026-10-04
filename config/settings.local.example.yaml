@@ -1,0 +1,20 @@
+# Copy to config/settings.local.yaml (git-ignored) and fill in. Never commit it.
+# Every value can instead come from env vars:
+#   ROOSTOO_API_KEY_TEST / ROOSTOO_SECRET_KEY_TEST
+#   ROOSTOO_API_KEY_COMPETITION / ROOSTOO_SECRET_KEY_COMPETITION
+#   ROOSTOO_ENV=TEST|COMPETITION
+#   TELEGRAM_BOT_TOKEN_<CHANNEL> / TELEGRAM_CHAT_ID_<CHANNEL>
+roostoo:
+  keys:
+    TEST:
+      api_key: ""
+      secret_key: ""
+    COMPETITION:
+      api_key: ""
+      secret_key: ""
+
+notifications:
+  telegram:
+    chat_id: ""
+    channels:
+      system:       { bot_token: "<system bot token>", chat_id: "" }

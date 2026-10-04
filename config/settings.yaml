@@ -1,0 +1,114 @@
+# =====================================================================
+# roostoo_compet — runtime configuration
+# =====================================================================
+# All tunables live here so code stays generic. Secrets (Roostoo keys,
+# Telegram tokens) go in config/settings.local.yaml (git-ignored) or env vars —
+# see settings.local.example.yaml. Never commit keys.
+
+# --- Roostoo (broker) ---
+# env selects the key set: TEST (general/testing account) or COMPETITION
+# (official round). Flip to COMPETITION deliberately; env ROOSTOO_ENV overrides.
+roostoo:
+  base_url: https://mock-api.roostoo.com
+  env: COMPETITION            # official round keys (TEST = general/testing account)
+  max_calls_per_minute: 25     # FAQ limit is 30/min across ALL calls — keep headroom
+  timeout_seconds: 10
+  max_retries: 3
+
+# --- Binance (market data: public spot REST, no key) ---
+binance:
+  base_url: https://data-api.binance.vision/api/v3   # market-data mirror (api.binance.com is geo-blocked in some regions)
+  quote_asset: USDT            # Roostoo BTC/USD <-> Binance BTCUSDT
+  futures_base_url: https://fapi.binance.com/fapi/v1  # USDS-M perps, volume only (451 from the US)
+
+# --- Strategy ---
+# name selects the class in engine/factory.py STRATEGIES; it is also the
+# deployment name in the DB and the Telegram channel key. `params` is passed to
+# the strategy as-is.
+strategy:
+  name: xs_momentum
+  # Roostoo crypto with Binance spot history. Excluded: PAXG (gold, not a coin),
+  # OMNI and TON (no Binance spot USDT pair), and the 21 tokenised stocks.
+  pairs: [1000CHEEMS/USD, AAVE/USD, ADA/USD, APT/USD, ARB/USD, ASTER/USD, AVAX/USD,
+          AVNT/USD, BIO/USD, BMT/USD, BNB/USD, BONK/USD, BTC/USD, CAKE/USD, CFX/USD,
+          CRV/USD, DOGE/USD, DOT/USD, EDEN/USD, EIGEN/USD, ENA/USD, ETH/USD, FET/USD,
+          FIL/USD, FLOKI/USD, FORM/USD, HBAR/USD, HEMI/USD, ICP/USD, LINEA/USD, LINK/USD,
+          LISTA/USD, LTC/USD, MIRA/USD, NEAR/USD, ONDO/USD, OPEN/USD, PENDLE/USD,
+          PENGU/USD, PEPE/USD, PLUME/USD, POL/USD, PUMP/USD, S/USD, SEI/USD, SHIB/USD,
+          SOL/USD, SOMI/USD, STO/USD, SUI/USD, TAO/USD, TRUMP/USD, TRX/USD, TUT/USD,
+          UNI/USD, VIRTUAL/USD, WIF/USD, WLD/USD, WLFI/USD, XLM/USD, XPL/USD, XRP/USD,
+          ZEC/USD, ZEN/USD]
+  bar_interval: 1d             # Binance kline interval (1m,5m,15m,1h,4h,1d,...)
+  lookback_bars: 60            # >= formation + holding + adv_window days
+  rebalance_seconds: 86400     # daily, just after the 00:00 UTC close
+  volume_source: perp          # liquidity screen on Binance perp volume, as researched
+  params:                      # research_notebook/Roostoo_ShortTerm_Momentum.ipynb
+    formation_days: 14
+    holding_days: 3
+    quantile: 0.20
+    adv_floor_usd: 20000000      # on perp dollar volume
+    adv_floor_usd_spot: 4000000  # fallback on spot volume if fapi is unreachable
+    long_gross: 0.5
+    short_gross: 0.5
+
+# --- Risk: limits applied to the strategy's target weights ---
+risk:
+  max_gross_exposure: 1.0      # sum |w|  (1.0 = no leverage)
+  max_net_exposure: 1.0        # |sum w|
+  max_weight_per_pair: 0.25
+  min_order_usd: 10            # skip rebalance deltas smaller than this
+  allow_short: true            # enable /v6 short endpoints (xs_momentum is long-short)
+  cash_buffer_pct: 0.01        # keep 1% of equity undeployed for fees/rounding
+
+# --- Engine loop ---
+engine:
+  poll_interval_seconds: 60    # each poll costs ~2-3 Roostoo calls (ticker, balance, shorts)
+  snapshot_interval_minutes: 60
+  stale_order_seconds: 300     # cancel unfilled LIMIT orders after this
+  fill_sync_every_n_polls: 5   # query_order cadence (1 call)
+  status_report_minutes: 60    # Telegram equity + holdings report (0 = off); no Roostoo calls
+  order_type: MARKET           # MARKET, or LIMIT priced at the opposite touch (unfilled ones cancelled after stale_order_seconds)
+
+# --- Persistence (trade-record DB) ---
+persistence:
+  enabled: true
+  db_path: data/roostoo_compet.db
+
+# --- Per-strategy capital allocation (USD) — return-% denominator ---
+allocations:
+  xs_momentum: 100000         # competition account starting equity (USD)
+
+# --- Benchmarks (Binance spot daily closes, stored by the engine) ---
+benchmarks:
+  enabled: true
+  history_days: 120
+  indices:
+    - {name: "BTC", symbol: "BTCUSDT"}
+    - {name: "ETH", symbol: "ETHUSDT"}
+
+# --- FX (everything is USD; USDT treated as USD) ---
+fx:
+  reporting_currency: USD
+  rates: {}
+
+# --- One-terminal supervisor (scripts/run_all) ---
+runners:
+  auto_restart: true
+  enabled:
+    trader: true               # scripts.run_trader — the trading engine
+
+# --- Notifications (multi-bot Telegram) ---
+# One bot for everything: only the `system` channel is configured, and every
+# strategy without its own channel falls back to it. Token + chat_id go in
+# settings.local.yaml.
+notifications:
+  enabled: true
+  telegram:
+    chat_id: ""
+    channels:
+      system:       { bot_token: "", chat_id: "" }
+
+# --- Logging ---
+logging:
+  level: INFO
+  dir: logs

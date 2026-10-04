@@ -1,0 +1,6 @@
+pandas>=2.0          # tests only (strategy parity test)
+PyYAML>=6.0
+SQLAlchemy>=2.0
+alembic>=1.12
+pytest>=7.0
+# Roostoo, Binance and Telegram all use the stdlib (urllib/hmac) — no SDKs.
