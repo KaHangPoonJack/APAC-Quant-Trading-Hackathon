@@ -7,7 +7,7 @@ spot klines as its market-data source.
 ## How it works
 
 - A strategy (`signals/`) returns target portfolio weights, such as
-  `{"BTC/USD": 0.4, "ETH/USD": -0.1}`.
+  `{"BTC/USD": 0.4, "ETH/USD": -0.1}`. 
 - The engine applies risk caps and compares the targets with what the account
   actually holds.
 - It sends only the orders needed to close the gap, selling before it buys.
