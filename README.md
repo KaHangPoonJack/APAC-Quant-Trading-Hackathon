@@ -2,7 +2,7 @@
 
 An autonomous trading bot for the Roostoo Quant Trading Hackathon. It trades
 through the **Roostoo** REST API (spot and shorts) and uses **Binance** public
-spot klines as its market-data source.
+spot klines as its market-data source. 
 
 ## How it works
 
