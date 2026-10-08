@@ -162,11 +162,13 @@ the system Telegram bot is alerted once, and once more on recovery.
   sends `qty × price`. Market shorts fill at MaxBid. Opening or closing a short
   costs 0.1% each way. Closes are reduce-only and return **no order id**; the
   fill shows up in `query_order` with `Side=SHORT_CLOSE`.
-- **Equity** = wallet USD (Free+Lock) + spot coins × mid + Σ short
-  `PositionValue`. A short's collateral leaves the wallet when the short opens,
-  and `PositionValue` = collateral + unrealized PnL.
-  `scripts/check_connection.py` prints each term so you can check it against
-  the Roostoo UI.
+- **Equity** = USD Free + (USD Lock − Σ short `Collateral`) + spot coins × mid
+  + Σ short `PositionValue`. Opening a short moves its collateral from USD Free
+  into USD **Lock**, and `PositionValue` = collateral + unrealized PnL also
+  contains it, so it is subtracted from Lock to count it once (confirmed live
+  2026-10-08: Lock equalled Σ Collateral to the cent; counting both inflated
+  equity by ~40%). `scripts/check_connection.py` prints each term so you can
+  check it against the Roostoo UI.
 - **Fills** come from finished orders in `query_order` (there is no deal feed),
   keyed `roostoo-<OrderID>`. A BUY commission charged in the coin is converted
   to USD. In that case the broker holds slightly less than the recorded qty;
@@ -183,8 +185,9 @@ the system Telegram bot is alerted once, and once more on recovery.
    immediately) matches the `OrderID` in `query_order`. If it doesn't, short
    opens are recorded as adopted orders under the running strategy, so PnL is
    still correct.
-3. Whether the equity formula matches the Roostoo leaderboard's balance once a
-   short is open.
+3. ~~Whether the equity formula matches the Roostoo leaderboard's balance once a
+   short is open.~~ Resolved 2026-10-08: short collateral sits in USD Lock (see
+   **Equity** above).
 4. Whether `ticker` counts toward the 30/min limit. The code assumes it does.
 
 ---

@@ -16,11 +16,13 @@ Exposes the duck-typed surface the rest of the system already uses
 single venue (core.models.MARKET).
 
 Valuation (USD):
-    equity = wallet USD (Free+Lock) + Σ spot coins × mid + Σ short PositionValue
-A short's collateral leaves the wallet when the short opens and comes back on
-close (`ReturnAmount`), and PositionValue = collateral + unrealized PnL — so the
-three terms don't double count. Verify on the TEST account with
-`scripts/check_connection.py`, which prints each term.
+    equity = USD Free + (USD Lock − Σ short Collateral) + Σ spot coins × mid
+             + Σ short PositionValue
+Roostoo moves a short's collateral from USD Free into USD Lock (confirmed on the
+COMPETITION account: Lock == Σ Collateral to the cent), and PositionValue =
+collateral + unrealized PnL also contains it. The collateral is therefore taken
+out of Lock so it is counted once; whatever Lock remains (e.g. a resting spot
+LIMIT buy) is still cash. `scripts/check_connection.py` prints each term.
 
 Call budget: balance and short positions are cached for `cache_seconds` and
 invalidated after every order, so one poll that asks for account(), positions()
@@ -164,8 +166,12 @@ class RoostooBroker:
         free, lock = num(usd, "Free"), num(usd, "Lock")
         legs = self.position_legs(market)
         longs = sum(p.market_value for p in legs if p.qty > 0)
-        short_value = sum(num(r, "PositionValue") for r in self.short_rows())
-        equity = free + lock + longs + short_value
+        rows = self.short_rows()
+        short_value = sum(num(r, "PositionValue") for r in rows)
+        collateral = sum(num(r, "Collateral") for r in rows)
+        # Collateral sits in USD Lock AND in PositionValue — count it once.
+        other_lock = max(0.0, lock - collateral)
+        equity = free + other_lock + longs + short_value
         return AccountSnapshot(
             market=MARKET, cash=free, total_assets=equity, buying_power=free,
             currency=UNIT, positions=self.positions(market),

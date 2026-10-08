@@ -105,8 +105,12 @@ def main() -> int:
         acc = broker.account()
         longs = sum(p.market_value for p in legs if p.qty > 0)
         short_val = sum(num(r, "PositionValue") for r in shorts)
+        collateral = sum(num(r, "Collateral") for r in shorts)
+        usd_cash = num(usd, "Free") + max(0.0, num(usd, "Lock") - collateral)
+        log.info("short collateral %.2f (held in USD Lock, counted once via PositionValue)",
+                 collateral)
         log.info("equity = USD %.2f + longs %.2f + shorts(PositionValue) %.2f = %.2f",
-                 num(usd, "Free") + num(usd, "Lock"), longs, short_val, acc.total_assets)
+                 usd_cash, longs, short_val, acc.total_assets)
         log.info("account id (DB): %s", broker.acc_id())
     except Exception as exc:  # noqa: BLE001
         ok = False

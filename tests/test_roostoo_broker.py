@@ -81,6 +81,27 @@ def test_equity_is_wallet_usd_plus_longs_plus_short_position_value(broker):
     assert acc.cash == 4000 and acc.buying_power == 4000 and acc.currency == "USD"
 
 
+def test_short_collateral_in_usd_lock_is_counted_once():
+    # Live COMPETITION snapshot 2026-10-08: USD Lock == Σ Collateral exactly.
+    c = FakeClient()
+    c.wallet["USD"] = {"Free": 208.34, "Lock": 38968.24}
+    c.shorts = [{"Pair": "ETH/USD", "EntryPrice": 3100, "ShortQty": 12.570400,
+                 "Collateral": 38968.24, "CurrentPrice": 2672.53,
+                 "UnrealizedPNL": 5326.47, "PositionValue": 44294.71}]
+    acc = RoostooBroker(c, FakeMD(), clock=lambda: 0.0).account()
+    longs = 0.05 * 60000
+    assert acc.total_assets == pytest.approx(208.34 + longs + 44294.71)
+    assert acc.buying_power == 208.34
+
+
+def test_lock_beyond_short_collateral_is_still_cash():
+    # e.g. a resting spot LIMIT buy locks USD that is not short collateral
+    c = FakeClient()
+    c.wallet["USD"] = {"Free": 1000, "Lock": 3100 + 500}
+    acc = RoostooBroker(c, FakeMD(), clock=lambda: 0.0).account()
+    assert acc.total_assets == pytest.approx(1000 + 500 + 3000 + 3199)
+
+
 def test_reads_are_cached_within_a_poll(broker):
     broker.account(); broker.positions(); broker.position_legs()
     assert broker._c.calls.count("balance") == 1
