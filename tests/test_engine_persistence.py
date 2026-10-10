@@ -70,13 +70,14 @@ class FixedWeights(Strategy):
         return self.weights
 
 
-def _engine(tmp_path, strategy, broker, clock=lambda: 7200.0 + 10):
+def _engine(tmp_path, strategy, broker, clock=lambda: 7200.0 + 10, allow_short=False):
     base = load_config()
     cfg = replace(base,
                   strategy=StrategyConfig(name=strategy.name, pairs=["BTC/USD", "ETH/USD"],
                                           rebalance_seconds=3600),
                   risk=RiskConfig(max_gross_exposure=1.0, max_weight_per_pair=0.6,
-                                  cash_buffer_pct=0.0, min_order_usd=10),
+                                  cash_buffer_pct=0.0, min_order_usd=10,
+                                  allow_short=allow_short),
                   engine=EngineConfig(poll_interval_seconds=60))
     db = make_engine(tmp_path / "eng.db")
     Base.metadata.create_all(db)
@@ -133,6 +134,28 @@ def test_omitted_pair_is_flattened(tmp_path):
     eng, _ = _engine(tmp_path, FixedWeights({"BTC/USD": 0.0}), broker)
     eng.run_once()
     assert [(o.side, o.code, o.qty) for o in broker.placed] == [(Side.SELL, "ETH/USD", 2.0)]
+
+
+class LockedCashBroker(FakeBroker):
+    """Equity $10k but only $5k free — like short collateral/profit held by Roostoo."""
+
+    def account(self, market=MARKET):
+        acc = super().account(market)
+        return replace(acc, total_assets=10_000.0, buying_power=5_000.0, cash=5_000.0)
+
+
+def test_cash_shortfall_scales_every_entry_instead_of_skipping_the_last(tmp_path):
+    # Old behaviour: BTC (sorts first) got its full $4k, ETH's short was blocked.
+    broker = LockedCashBroker()
+    strat = FixedWeights({"BTC/USD": 0.4, "ETH/USD": -0.4})
+    eng, _ = _engine(tmp_path, strat, broker, allow_short=True)
+    eng.run_once()
+    assert [(o.side, o.code) for o in broker.placed] == [(Side.BUY, "BTC/USD"),
+                                                         (Side.SHORT_OPEN, "ETH/USD")]
+    btc, eth = (o.notional for o in broker.placed)
+    assert btc == pytest.approx(eth, rel=0.01)            # shortfall shared evenly
+    assert btc + eth <= 5_000.0                           # fits the free cash
+    assert btc == pytest.approx(5_000 / 2 / 1.002, rel=0.01)
 
 
 def test_none_means_hold(tmp_path):

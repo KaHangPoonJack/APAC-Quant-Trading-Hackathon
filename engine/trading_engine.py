@@ -34,14 +34,14 @@ from core.models import MARKET, Bar, OrderRequest, OrderState
 from core.notifier import Notifier
 from data.market_data import MarketData
 from engine.benchmarks import BenchmarkFetcher
-from engine.rebalance import plan_rebalance
+from engine.rebalance import plan_rebalance, scale_entries
 from engine.status_report import format_status
 from engine.recorder import PersistenceService
 from engine.recovery import RecoveryService
 from execution.order_manager import OrderManager
 from execution.portfolio import Portfolio
 from risk.position_sizer import PositionSizer
-from risk.risk_manager import RiskManager
+from risk.risk_manager import FEE_BUFFER, RiskManager
 from signals.base import Strategy, StrategyContext
 from store.timeutil import now_utc
 
@@ -252,9 +252,30 @@ class TradingEngine:
             return []
 
         sent: List[OrderState] = []
-        reserved = 0.0
         account = self.portfolio.account
-        for req in plan.orders:
+        exits = [o for o in plan.orders if not o.side.adds_exposure]
+        entries = [o for o in plan.orders if o.side.adds_exposure]
+        for req in exits:                       # always approved by risk.check
+            state = self._submit(req)
+            if state is not None:
+                sent.append(state)
+        if sent:
+            # Exits free cash, but MARKET proceeds aren't in the cached
+            # snapshot yet — re-read once so entries can use them.
+            try:
+                account = self.portfolio.refresh()
+            except Exception as exc:  # noqa: BLE001
+                log.warning("refresh after exits failed: %s", exc)
+
+        # Share any cash shortfall across ALL entries (longs and shorts alike)
+        # instead of letting the pairs that sort last absorb it.
+        entries, scale_notes = scale_entries(entries, account.buying_power, rules,
+                                             self.sizer, FEE_BUFFER)
+        for n in scale_notes:
+            log.info("plan: %s", n)
+
+        reserved = 0.0
+        for req in entries:
             decision = self.risk.check(req, account, reserved_usd=reserved)
             if not decision.approved:
                 log.warning("[%s] %s blocked by risk: %s", req.code, req.side.value,
@@ -264,15 +285,7 @@ class TradingEngine:
             if state is None:
                 continue
             sent.append(state)
-            if req.side.adds_exposure:
-                reserved += req.notional
-            else:
-                # Exits free cash, but MARKET proceeds aren't in the cached
-                # snapshot yet — re-read so entries can use them.
-                try:
-                    account = self.portfolio.refresh()
-                except Exception as exc:  # noqa: BLE001
-                    log.warning("refresh after exit failed: %s", exc)
+            reserved += req.notional
         self._sync_pending = True
         return sent
 

@@ -13,11 +13,16 @@ add it (BUY, SHORT_OPEN), so cash freed by exits funds the entries.
 
 Deltas below `min_order_usd` (or the pair's MiniOrder) are skipped to avoid
 churning fees — except going fully flat, which only has to clear MiniOrder.
+
+`scale_entries` runs after the exits have filled: if the adding orders need more
+free USD than the account has, every one of them is shrunk by the same factor,
+so a cash shortfall is shared by longs and shorts instead of falling on
+whichever pairs sort last.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Dict, Iterable, List
+from dataclasses import dataclass, field, replace
+from typing import Dict, Iterable, List, Sequence, Tuple
 
 from core.enums import OrderType, Side
 from core.models import OrderRequest, PairRule, Position, Ticker
@@ -107,3 +112,34 @@ def plan_rebalance(targets: Dict[str, float], equity: float,
 
     plan.orders = reducing + adding
     return plan
+
+
+def scale_entries(orders: Sequence[OrderRequest], available_usd: float,
+                  rules: Dict[str, PairRule], sizer: PositionSizer,
+                  fee_buffer: float = 0.0) -> Tuple[List[OrderRequest], List[str]]:
+    """Fit exposure-adding orders into `available_usd` by one common factor.
+
+    Returns (orders, notes). Orders are returned unchanged when they already fit.
+    Otherwise each qty is multiplied by k = available / (Σ notional × (1 +
+    fee_buffer)) and rounded DOWN to the pair's step, so the total never
+    exceeds what is free; an order that drops below the minimum is skipped.
+    """
+    need = sum(o.notional for o in orders) * (1.0 + fee_buffer)
+    if need <= 0 or need <= available_usd:
+        return list(orders), []
+    k = max(0.0, available_usd) / need
+    notes = [f"entries need ${need:,.2f} but ${max(0.0, available_usd):,.2f} is free "
+             f"— every entry scaled by {k:.3f}"]
+    out: List[OrderRequest] = []
+    for o in orders:
+        rule = rules.get(o.code)
+        if rule is None:
+            notes.append(f"{o.code}: no pair rule — entry skipped")
+            continue
+        qty = rule.round_qty(o.qty * k)
+        if not sizer.is_tradeable(qty, o.price, rule):
+            notes.append(f"{o.code}: {o.side.value} scaled to {qty} (${qty * o.price:,.2f}) "
+                         "below minimum — skipped")
+            continue
+        out.append(replace(o, qty=qty))
+    return out, notes

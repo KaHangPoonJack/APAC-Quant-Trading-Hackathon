@@ -124,7 +124,10 @@ after every order. Then the loop:
 1. Rebalances when a new wall-clock bucket of `rebalance_seconds` starts. It
    waits 5s past the boundary so the Binance bar has closed. A rebalance asks
    the strategy for weights, clamps them, plans orders, checks risk, submits,
-   and records each order.
+   and records each order. Exits are sent first; if the entries then need more
+   free USD than is left, `engine/rebalance.scale_entries` shrinks every entry
+   by one common factor so the shortfall hits longs and shorts equally (it used
+   to skip whichever pairs sorted last, which skewed the book net long).
 2. Runs `sync_fills` every `fill_sync_every_n_polls` polls and right after
    trading. This is one `query_order` call.
 3. Writes equity and deployment snapshots every `snapshot_interval_minutes`, the

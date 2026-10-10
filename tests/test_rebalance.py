@@ -2,8 +2,8 @@
 import pytest
 
 from core.enums import Side
-from core.models import PairRule, Position, Ticker
-from engine.rebalance import plan_rebalance
+from core.models import OrderRequest, PairRule, Position, Ticker
+from engine.rebalance import plan_rebalance, scale_entries
 from risk.position_sizer import PositionSizer
 
 RULES = {"BTC/USD": PairRule("BTC/USD", 2, 5, 1.0),
@@ -79,3 +79,36 @@ def test_missing_ticker_or_rule_is_skipped_with_note():
 
 def test_zero_equity_plans_nothing():
     assert plan({"BTC/USD": 0.5}, equity=0).orders == []
+
+
+# -- scale_entries: share a cash shortfall across every entry ------------------
+ENTRIES = [OrderRequest("BTC/USD", Side.BUY, 0.05, 60010),          # ~$3,000
+           OrderRequest("ETH/USD", Side.SHORT_OPEN, 1.0, 2999)]     # ~$3,000
+
+
+def test_entries_that_fit_are_unchanged():
+    out, notes = scale_entries(ENTRIES, 10_000, RULES, SIZER, fee_buffer=0.002)
+    assert out == ENTRIES and notes == []
+
+
+def test_shortfall_scales_every_entry_by_the_same_factor():
+    out, notes = scale_entries(ENTRIES, 3_000, RULES, SIZER, fee_buffer=0.002)
+    k = 3_000 / (sum(o.notional for o in ENTRIES) * 1.002)
+    assert [o.code for o in out] == ["BTC/USD", "ETH/USD"]          # nobody skipped
+    for o, orig in zip(out, ENTRIES):
+        assert o.qty == pytest.approx(orig.qty * k, abs=1e-4)
+        assert o.qty <= orig.qty * k                                # rounded DOWN
+        assert (o.side, o.price) == (orig.side, orig.price)
+    assert sum(o.notional for o in out) * 1.002 <= 3_000
+    assert "scaled by" in notes[0]
+
+
+def test_entry_scaled_below_minimum_is_dropped():
+    small = ENTRIES + [OrderRequest("ETH/USD", Side.BUY, 0.01, 3001)]   # ~$30
+    out, notes = scale_entries(small, 1_000, RULES, SIZER, fee_buffer=0.002)
+    assert len(out) == 2 and any("below minimum" in n for n in notes)
+
+
+def test_no_free_cash_drops_all_entries():
+    out, _ = scale_entries(ENTRIES, -5.0, RULES, SIZER)
+    assert out == []
