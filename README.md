@@ -35,7 +35,7 @@ git-ignored `config/settings.local.yaml` or in environment variables. See
 
 | Path | Role |
 |---|---|
-| `signals/` | strategies (pure): `base.py` contract, `example_noop.py`, `xs_momentum.py` (live: 14d/3d cross-sectional momentum, long-short) |
+| `signals/` | strategies (pure): `base.py` contract, `example_noop.py`, `xs_momentum.py` (14d/3d cross-sectional momentum, long-short; live 2026-10-04 → 10-14, config in `config/strategies/xs_momentum.yaml`), `directional_hold.py` (live from 2026-10-14: fixed 5-coin book, enter then freeze) |
 | `engine/` | loop, rebalance planner, recorder, recovery, benchmarks, factory |
 | `execution/` | Roostoo client (signing, rate limit) + broker adapter |
 | `data/` | Binance klines, Roostoo tickers/pair rules |

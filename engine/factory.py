@@ -27,6 +27,7 @@ from execution.roostoo_client import RoostooClient
 from risk.position_sizer import PositionSizer
 from risk.risk_manager import RiskManager
 from signals.base import Strategy
+from signals.directional_hold import DirectionalHold
 from signals.example_noop import NoOpStrategy
 from signals.xs_momentum import CrossSectionalMomentum
 from store.db import make_engine, make_session_factory
@@ -37,6 +38,7 @@ log = logging.getLogger(__name__)
 STRATEGIES: Dict[str, Type[Strategy]] = {
     NoOpStrategy.name: NoOpStrategy,
     CrossSectionalMomentum.name: CrossSectionalMomentum,
+    DirectionalHold.name: DirectionalHold,
 }
 
 

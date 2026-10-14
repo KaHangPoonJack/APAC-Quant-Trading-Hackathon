@@ -1,0 +1,34 @@
+# Directional 5-coin book chosen by the team (2026-10-14): enter once, then hold
+# untouched until the competition auto-liquidates every account.
+# signals/directional_hold.py documents the entry/freeze rules.
+
+strategy:
+  name: directional_hold
+  # Every pair the momentum book could hold stays listed, so any old position
+  # outside the 5-coin book is closed during the entry window.
+  pairs: [1000CHEEMS/USD, AAVE/USD, ADA/USD, APT/USD, ARB/USD, ASTER/USD, AVAX/USD,
+          AVNT/USD, BIO/USD, BMT/USD, BNB/USD, BONK/USD, BTC/USD, CAKE/USD, CFX/USD,
+          CRV/USD, DOGE/USD, DOT/USD, EDEN/USD, EIGEN/USD, ENA/USD, ETH/USD, FET/USD,
+          FIL/USD, FLOKI/USD, FORM/USD, HBAR/USD, HEMI/USD, ICP/USD, LINEA/USD, LINK/USD,
+          LISTA/USD, LTC/USD, MIRA/USD, NEAR/USD, ONDO/USD, OPEN/USD, PENDLE/USD,
+          PENGU/USD, PEPE/USD, PLUME/USD, POL/USD, PUMP/USD, S/USD, SEI/USD, SHIB/USD,
+          SOL/USD, SOMI/USD, STO/USD, SUI/USD, TAO/USD, TRUMP/USD, TRX/USD, TUT/USD,
+          UNI/USD, VIRTUAL/USD, WIF/USD, WLD/USD, WLFI/USD, XLM/USD, XPL/USD, XRP/USD,
+          ZEC/USD, ZEN/USD]
+  bar_interval: 1d
+  lookback_bars: 2             # bars are not used; keep the Binance fetch small
+  rebalance_seconds: 86400     # first rebalance on (re)start, then daily at 00:00 UTC
+  volume_source: spot          # no perp volume needed
+  params:
+    # 5 x 19.8% = 99% gross (Roostoo caps long + short at ~100% of equity;
+    # 1% stays as cash for fees). Net long 59.4%.
+    book:
+      VIRTUAL/USD: 0.198
+      NEAR/USD: 0.198
+      XLM/USD: 0.198
+      PENGU/USD: 0.198
+      UNI/USD: -0.198
+    fill_ratio: 0.95           # a leg at >= 95% of its target counts as filled
+    # Hard stop for the entry phase: after this the strategy NEVER trades again,
+    # even after a restart. Covers the deploy-day restart and 00:00 UTC Oct 15.
+    entry_until: "2026-10-15T01:00:00+00:00"

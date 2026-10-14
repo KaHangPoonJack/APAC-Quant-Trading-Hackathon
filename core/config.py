@@ -220,10 +220,18 @@ def _deep_merge(base: dict, override: dict) -> dict:
 
 
 def load_config(path: os.PathLike | str | None = None) -> AppConfig:
-    """Load settings.yaml, overlaying settings.local.yaml if present."""
+    """Load settings.yaml, overlaying the file named by `strategy_file` (relative
+    to settings.yaml's folder) and then settings.local.yaml if present."""
     path = Path(path) if path else DEFAULT_CONFIG
     with open(path, "r", encoding="utf-8") as fh:
         raw = yaml.safe_load(fh) or {}
+
+    strategy_file = raw.pop("strategy_file", None)
+    if strategy_file:
+        sf = Path(strategy_file)
+        sf = sf if sf.is_absolute() else path.parent / sf
+        with open(sf, "r", encoding="utf-8") as fh:
+            raw = _deep_merge(raw, yaml.safe_load(fh) or {})
 
     if path == DEFAULT_CONFIG and LOCAL_CONFIG.exists():
         with open(LOCAL_CONFIG, "r", encoding="utf-8") as fh:

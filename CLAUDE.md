@@ -110,9 +110,15 @@ class MyStrategy(Strategy):
 - Strategies stay pure: no broker calls and no I/O. An optional
   `on_recover(legs)` hook runs at startup.
 - To add a strategy, create the file in `signals/` (copy `example_noop.py`) and
-  register it in `engine/factory.py` `STRATEGIES`. Then set `strategy.name`,
-  `pairs`, `bar_interval`, `lookback_bars`, `rebalance_seconds` and `params` in
-  `settings.yaml`. `params` is passed to the strategy's constructor untouched.
+  register it in `engine/factory.py` `STRATEGIES`. Then write its `strategy:`
+  block (`name`, `pairs`, `bar_interval`, `lookback_bars`, `rebalance_seconds`,
+  `params`) in `config/strategies/<name>.yaml` and point `strategy_file` in
+  `settings.yaml` at it; `load_config` merges that file over settings.yaml.
+  `params` is passed to the strategy's constructor untouched.
+- Strategies: `xs_momentum` (research strategy, live 2026-10-04 → 10-14, kept
+  for the judges) and `directional_hold` (live from 2026-10-14: the team's fixed
+  5-coin book; tops legs up to target until `entry_until`, never trims, then
+  returns None forever).
 
 ### Engine loop (`engine/trading_engine.py`)
 

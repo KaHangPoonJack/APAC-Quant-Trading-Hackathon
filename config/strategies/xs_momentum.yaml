@@ -1,0 +1,29 @@
+# Short-term cross-sectional momentum, long-short (research_notebook/
+# Roostoo_ShortTerm_Momentum.ipynb). Live 2026-10-04 -> 2026-10-14.
+# To run it again, point `strategy_file` in config/settings.yaml here.
+
+strategy:
+  name: xs_momentum
+  # Roostoo crypto with Binance spot history. Excluded: PAXG (gold, not a coin),
+  # OMNI and TON (no Binance spot USDT pair), and the 21 tokenised stocks.
+  pairs: [1000CHEEMS/USD, AAVE/USD, ADA/USD, APT/USD, ARB/USD, ASTER/USD, AVAX/USD,
+          AVNT/USD, BIO/USD, BMT/USD, BNB/USD, BONK/USD, BTC/USD, CAKE/USD, CFX/USD,
+          CRV/USD, DOGE/USD, DOT/USD, EDEN/USD, EIGEN/USD, ENA/USD, ETH/USD, FET/USD,
+          FIL/USD, FLOKI/USD, FORM/USD, HBAR/USD, HEMI/USD, ICP/USD, LINEA/USD, LINK/USD,
+          LISTA/USD, LTC/USD, MIRA/USD, NEAR/USD, ONDO/USD, OPEN/USD, PENDLE/USD,
+          PENGU/USD, PEPE/USD, PLUME/USD, POL/USD, PUMP/USD, S/USD, SEI/USD, SHIB/USD,
+          SOL/USD, SOMI/USD, STO/USD, SUI/USD, TAO/USD, TRUMP/USD, TRX/USD, TUT/USD,
+          UNI/USD, VIRTUAL/USD, WIF/USD, WLD/USD, WLFI/USD, XLM/USD, XPL/USD, XRP/USD,
+          ZEC/USD, ZEN/USD]
+  bar_interval: 1d             # Binance kline interval (1m,5m,15m,1h,4h,1d,...)
+  lookback_bars: 60            # >= formation + holding + adv_window days
+  rebalance_seconds: 86400     # daily, just after the 00:00 UTC close
+  volume_source: perp          # liquidity screen on Binance perp volume, as researched
+  params:                      # research_notebook/Roostoo_ShortTerm_Momentum.ipynb
+    formation_days: 14
+    holding_days: 3
+    quantile: 0.20
+    adv_floor_usd: 20000000      # on perp dollar volume
+    adv_floor_usd_spot: 4000000  # fallback on spot volume if fapi is unreachable
+    long_gross: 0.5
+    short_gross: 0.5
