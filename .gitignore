@@ -16,9 +16,6 @@ data/*.db-wal
 data/*.db-shm
 data/*.json
 
-# Research notebooks (local only)
-research_notebook/
-
 # Local overrides / secrets
 config/settings.local.yaml
 .env
